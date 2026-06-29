@@ -1,0 +1,6 @@
+flask
+anthropic
+requests
+python-dotenv
+gspread
+google-auth

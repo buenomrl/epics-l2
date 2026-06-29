@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>L2 Activity Controller</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #1a1a2e; }
+    .drop-zone { border: 2px dashed #4a4a8a; transition: border-color 0.2s, background 0.2s; }
+    .drop-zone.dragover { border-color: #7c6fff; background: #2a2a4e; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    .tab-btn.active { background: #4f46e5; color: white; }
+    .badge-exact { background: #166534; color: #bbf7d0; }
+    .badge-fuzzy { background: #713f12; color: #fef08a; }
+    .badge-not_found { background: #7f1d1d; color: #fecaca; }
+  </style>
+</head>
+<body class="min-h-screen text-gray-100 p-6">
+<div class="max-w-5xl mx-auto space-y-5">
+
+  <!-- Header + Tabs -->
+  <div class="text-center">
+    <h1 class="text-2xl font-bold text-purple-400">L2 Activity Controller</h1>
+  </div>
+  <div class="flex gap-2 bg-gray-800 p-1 rounded-xl">
+    <button class="tab-btn active flex-1 py-2 rounded-lg text-sm font-semibold transition" onclick="switchTab('bosses')">
+      📅 Bosses → Discord
+    </button>
+    <button class="tab-btn flex-1 py-2 rounded-lg text-sm font-semibold transition text-gray-400 hover:text-white" onclick="switchTab('cc')">
+      👥 CC → Planilha
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ TAB: BOSSES -->
+  <div id="tab-bosses" class="space-y-5">
+    <p class="text-gray-400 text-sm text-center">Suba a screenshot do boss tracker → gera preview → envia pro Discord</p>
+
+    <div id="boss-drop-zone" class="drop-zone rounded-xl p-8 text-center cursor-pointer"
+         onclick="document.getElementById('boss-file-input').click()">
+      <div id="boss-drop-text">
+        <svg class="mx-auto mb-3 w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <p class="text-gray-300">Clique ou arraste a screenshot aqui</p>
+        <p class="text-gray-500 text-xs mt-1">JPG, PNG ou WebP</p>
+      </div>
+      <div id="boss-file-preview" class="hidden">
+        <img id="boss-preview-img" class="mx-auto max-h-40 rounded-lg object-contain" />
+        <p id="boss-file-name" class="text-gray-400 text-sm mt-2"></p>
+      </div>
+    </div>
+    <input id="boss-file-input" type="file" accept=".jpg,.jpeg,.png,.webp" class="hidden" />
+
+    <button id="btn-boss-preview" disabled
+            class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition">
+      Gerar Preview
+    </button>
+    <div id="boss-loading" class="hidden text-center text-purple-400 text-sm animate-pulse py-2">Processando imagem com Claude...</div>
+
+    <div id="boss-preview-box" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-gray-800 rounded-xl p-5 flex flex-col space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-indigo-400 uppercase tracking-wide font-semibold">Discord</p>
+            <p class="text-xs text-gray-500 mt-0.5">Horário UTC</p>
+          </div>
+          <button onclick="copyText('discord-text', this)" class="text-xs text-gray-400 hover:text-white border border-gray-600 hover:border-gray-400 px-2 py-1 rounded transition">Copiar</button>
+        </div>
+        <pre id="discord-text" class="text-green-300 text-sm leading-relaxed font-mono bg-gray-900 rounded-lg p-3 flex-1"></pre>
+        <button id="btn-send" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold text-sm transition">Enviar para o Discord</button>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-5 flex flex-col space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-green-400 uppercase tracking-wide font-semibold">WhatsApp</p>
+            <p class="text-xs text-gray-500 mt-0.5">Horário BRT (UTC-3)</p>
+          </div>
+          <button onclick="copyText('whatsapp-text', this)" class="text-xs text-gray-400 hover:text-white border border-gray-600 hover:border-gray-400 px-2 py-1 rounded transition">Copiar</button>
+        </div>
+        <pre id="whatsapp-text" class="text-green-300 text-sm leading-relaxed font-mono bg-gray-900 rounded-lg p-3 flex-1"></pre>
+        <div class="py-2.5 rounded-lg bg-gray-700 text-gray-400 text-sm text-center select-none">Apenas para copiar e colar no WhatsApp</div>
+      </div>
+    </div>
+    <div id="boss-status" class="hidden rounded-xl p-4 text-sm text-center font-medium"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ TAB: CC -->
+  <div id="tab-cc" class="hidden space-y-5">
+    <p class="text-gray-400 text-sm text-center">Informe o boss e a data, suba as prints do CC (uma por PT) e salve a presença na planilha.</p>
+
+    <!-- Boss + Data -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="text-xs text-gray-400 uppercase tracking-wide mb-1 block">Boss</label>
+        <input id="cc-boss" type="text" placeholder="ex: Orfen"
+               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" />
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 uppercase tracking-wide mb-1 block">Data</label>
+        <input id="cc-date" type="text" placeholder="ex: 18/06"
+               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" />
+      </div>
+    </div>
+
+    <!-- Multi-upload CC -->
+    <div id="cc-drop-zone" class="drop-zone rounded-xl p-6 text-center cursor-pointer"
+         onclick="document.getElementById('cc-file-input').click()">
+      <svg class="mx-auto mb-2 w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      <p class="text-gray-300 text-sm">Clique ou arraste as screenshots do CC</p>
+      <p class="text-gray-500 text-xs mt-1">Pode selecionar várias imagens de uma vez</p>
+      <div id="cc-file-list" class="mt-3 space-y-1"></div>
+    </div>
+    <input id="cc-file-input" type="file" accept=".jpg,.jpeg,.png,.webp" multiple class="hidden" />
+
+    <button id="btn-cc-process" disabled
+            class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition">
+      Processar Imagens
+    </button>
+    <div id="cc-loading" class="hidden text-center text-purple-400 text-sm animate-pulse py-2">Extraindo membros com Claude...</div>
+
+    <!-- Resultados editáveis -->
+    <div id="cc-results" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-300 font-semibold">Resultado — <span id="cc-total"></span> membros encontrados</p>
+        <button onclick="addEmptyRow()" class="text-xs border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white px-3 py-1 rounded transition">+ Adicionar membro</button>
+      </div>
+
+      <!-- Tabela de membros -->
+      <div class="bg-gray-800 rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-700 text-xs text-gray-400 uppercase tracking-wide">
+              <th class="text-left px-4 py-3 w-1/3">Membro</th>
+              <th class="text-left px-4 py-3 w-1/3">CP</th>
+              <th class="text-left px-4 py-3 w-24">Match</th>
+              <th class="px-4 py-3 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="cc-table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Aviso de warnings -->
+      <div id="cc-warnings" class="hidden bg-yellow-900/40 border border-yellow-700 rounded-xl p-4 text-sm text-yellow-300 space-y-1"></div>
+
+      <button id="btn-save-sheets"
+              class="w-full py-3 rounded-xl bg-green-700 hover:bg-green-600 font-semibold transition">
+        Salvar na Planilha Google Sheets
+      </button>
+    </div>
+
+    <div id="cc-status" class="hidden rounded-xl p-4 text-sm text-center font-medium"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Globals ──────────────────────────────────────────────────────────────────
+let currentDiscordMsg = '';
+let selectedBossFile = null;
+let selectedCCFiles = [];
+let allCPs = [];
+let attendanceData = [];
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tab-bosses').classList.toggle('hidden', tab !== 'bosses');
+  document.getElementById('tab-cc').classList.toggle('hidden', tab !== 'cc');
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const isActive = (i === 0 && tab === 'bosses') || (i === 1 && tab === 'cc');
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('text-gray-400', !isActive);
+  });
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function copyText(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copiado!';
+    btn.classList.add('text-green-400', 'border-green-400');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-green-400', 'border-green-400'); }, 2000);
+  });
+}
+
+function showStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = 'rounded-xl p-4 text-sm text-center font-medium';
+  el.classList.remove('hidden');
+  el.classList.add(type === 'success' ? 'bg-green-800' : 'bg-red-800');
+  el.classList.add(type === 'success' ? 'text-green-200' : 'text-red-200');
+  el.textContent = msg;
+  if (type === 'success') setTimeout(() => el.classList.add('hidden'), 6000);
+}
+
+// ── Tab Bosses ────────────────────────────────────────────────────────────────
+const bossDropZone = document.getElementById('boss-drop-zone');
+const bossFileInput = document.getElementById('boss-file-input');
+
+function setBossFile(file) {
+  if (!file) return;
+  selectedBossFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('boss-preview-img').src = e.target.result;
+    document.getElementById('boss-file-name').textContent = file.name;
+    document.getElementById('boss-drop-text').classList.add('hidden');
+    document.getElementById('boss-file-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('btn-boss-preview').disabled = false;
+  document.getElementById('boss-preview-box').classList.add('hidden');
+  document.getElementById('boss-status').classList.add('hidden');
+}
+
+bossFileInput.addEventListener('change', () => setBossFile(bossFileInput.files[0]));
+bossDropZone.addEventListener('dragover', e => { e.preventDefault(); bossDropZone.classList.add('dragover'); });
+bossDropZone.addEventListener('dragleave', () => bossDropZone.classList.remove('dragover'));
+bossDropZone.addEventListener('drop', e => { e.preventDefault(); bossDropZone.classList.remove('dragover'); setBossFile(e.dataTransfer.files[0]); });
+
+document.getElementById('btn-boss-preview').addEventListener('click', async () => {
+  if (!selectedBossFile) return;
+  const formData = new FormData();
+  formData.append('image', selectedBossFile);
+  document.getElementById('btn-boss-preview').disabled = true;
+  document.getElementById('boss-loading').classList.remove('hidden');
+  document.getElementById('boss-preview-box').classList.add('hidden');
+  document.getElementById('boss-status').classList.add('hidden');
+  try {
+    const res = await fetch('/preview', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) { showStatus('boss-status', data.error || 'Erro desconhecido.', 'error'); return; }
+    currentDiscordMsg = data.discord_message;
+    document.getElementById('discord-text').textContent = data.discord_message;
+    document.getElementById('whatsapp-text').textContent = data.whatsapp_message;
+    document.getElementById('boss-preview-box').classList.remove('hidden');
+  } catch { showStatus('boss-status', 'Erro de conexão com o servidor.', 'error'); }
+  finally { document.getElementById('boss-loading').classList.add('hidden'); document.getElementById('btn-boss-preview').disabled = false; }
+});
+
+document.getElementById('btn-send').addEventListener('click', async () => {
+  if (!currentDiscordMsg) return;
+  const btn = document.getElementById('btn-send');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: currentDiscordMsg }) });
+    const data = await res.json();
+    if (!res.ok) { showStatus('boss-status', data.error || 'Erro ao enviar.', 'error'); return; }
+    showStatus('boss-status', 'Mensagem enviada com sucesso no Discord!', 'success');
+  } catch { showStatus('boss-status', 'Erro de conexão ao enviar.', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Enviar para o Discord'; }
+});
+
+// ── Tab CC ────────────────────────────────────────────────────────────────────
+const ccDropZone = document.getElementById('cc-drop-zone');
+const ccFileInput = document.getElementById('cc-file-input');
+
+function updateCCFileList() {
+  const list = document.getElementById('cc-file-list');
+  list.innerHTML = selectedCCFiles.length
+    ? selectedCCFiles.map((f, i) => `
+        <div class="flex items-center justify-between bg-gray-700 rounded px-3 py-1.5 text-xs text-gray-300">
+          <span>📷 ${f.name}</span>
+          <button onclick="removeCCFile(${i})" class="text-gray-500 hover:text-red-400 ml-2">✕</button>
+        </div>`).join('')
+    : '';
+  document.getElementById('btn-cc-process').disabled = selectedCCFiles.length === 0;
+}
+
+function removeCCFile(i) {
+  selectedCCFiles.splice(i, 1);
+  updateCCFileList();
+}
+
+function addCCFiles(files) {
+  for (const f of files) {
+    if (!selectedCCFiles.find(x => x.name === f.name)) selectedCCFiles.push(f);
+  }
+  updateCCFileList();
+}
+
+ccFileInput.addEventListener('change', () => addCCFiles(ccFileInput.files));
+ccDropZone.addEventListener('dragover', e => { e.preventDefault(); ccDropZone.classList.add('dragover'); });
+ccDropZone.addEventListener('dragleave', () => ccDropZone.classList.remove('dragover'));
+ccDropZone.addEventListener('drop', e => { e.preventDefault(); ccDropZone.classList.remove('dragover'); addCCFiles(e.dataTransfer.files); });
+
+function badgeHtml(type) {
+  const labels = { exact: 'Exato', fuzzy: 'Fuzzy', not_found: 'Não encontrado' };
+  return `<span class="badge-${type} text-xs px-2 py-0.5 rounded font-medium">${labels[type] || type}</span>`;
+}
+
+function cpSelectHtml(rowIdx, selectedCp) {
+  const opts = ['', ...allCPs].map(cp =>
+    `<option value="${cp}" ${cp === selectedCp ? 'selected' : ''}>${cp || '— sem CP —'}</option>`
+  ).join('');
+  return `<select onchange="updateCP(${rowIdx}, this.value)" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs w-full focus:outline-none focus:border-purple-500">${opts}</select>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('cc-table-body');
+  tbody.innerHTML = attendanceData.map((row, i) => `
+    <tr class="border-b border-gray-700 hover:bg-gray-750">
+      <td class="px-4 py-2">
+        <input value="${row.member}" onchange="updateMember(${i}, this.value)"
+               class="bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 focus:outline-none w-full text-sm" />
+      </td>
+      <td class="px-4 py-2">${cpSelectHtml(i, row.cp)}</td>
+      <td class="px-4 py-2">${badgeHtml(row.match_type)}</td>
+      <td class="px-4 py-2 text-center">
+        <button onclick="removeRow(${i})" class="text-gray-600 hover:text-red-400 text-lg leading-none">×</button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('cc-total').textContent = attendanceData.length;
+}
+
+function updateCP(i, val) { attendanceData[i].cp = val; attendanceData[i].match_type = val ? 'exact' : 'not_found'; renderTable(); }
+function updateMember(i, val) { attendanceData[i].member = val; }
+function removeRow(i) { attendanceData.splice(i, 1); renderTable(); }
+function addEmptyRow() {
+  attendanceData.push({ member: '', cp: '', match_type: 'not_found' });
+  renderTable();
+  // Focus the new input
+  const inputs = document.querySelectorAll('#cc-table-body input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+document.getElementById('btn-cc-process').addEventListener('click', async () => {
+  const boss = document.getElementById('cc-boss').value.trim();
+  const date = document.getElementById('cc-date').value.trim();
+  if (!boss || !date) { showStatus('cc-status', 'Preencha o boss e a data antes de processar.', 'error'); return; }
+  if (!selectedCCFiles.length) return;
+
+  const formData = new FormData();
+  selectedCCFiles.forEach(f => formData.append('images', f));
+
+  document.getElementById('btn-cc-process').disabled = true;
+  document.getElementById('cc-loading').classList.remove('hidden');
+  document.getElementById('cc-results').classList.add('hidden');
+  document.getElementById('cc-status').classList.add('hidden');
+
+  try {
+    const res = await fetch('/process-cc', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) { showStatus('cc-status', data.error || 'Erro ao processar.', 'error'); return; }
+
+    allCPs = data.all_cps || [];
+    attendanceData = data.attendance || [];
+
+    // Sort: found first, then by CP name
+    attendanceData.sort((a, b) => {
+      if (!a.cp && b.cp) return 1;
+      if (a.cp && !b.cp) return -1;
+      return (a.cp || '').localeCompare(b.cp || '') || a.member.localeCompare(b.member);
+    });
+
+    renderTable();
+    document.getElementById('cc-results').classList.remove('hidden');
+
+    // Warnings
+    const notFound = attendanceData.filter(r => !r.cp);
+    const fuzzy = attendanceData.filter(r => r.match_type === 'fuzzy');
+    const warningsDiv = document.getElementById('cc-warnings');
+    const msgs = [];
+    if (notFound.length) msgs.push(`⚠ ${notFound.length} membro(s) não encontrado(s) na CP List — selecione a CP manualmente ou adicione ao arquivo.`);
+    if (fuzzy.length) msgs.push(`🔶 ${fuzzy.length} membro(s) com match fuzzy (nome similar) — verifique se estão corretos.`);
+    if (data.errors?.length) data.errors.forEach(e => msgs.push(`❌ ${e}`));
+    if (msgs.length) {
+      warningsDiv.innerHTML = msgs.map(m => `<p>${m}</p>`).join('');
+      warningsDiv.classList.remove('hidden');
+    } else {
+      warningsDiv.classList.add('hidden');
+    }
+  } catch { showStatus('cc-status', 'Erro de conexão com o servidor.', 'error'); }
+  finally { document.getElementById('cc-loading').classList.add('hidden'); document.getElementById('btn-cc-process').disabled = false; }
+});
+
+document.getElementById('btn-save-sheets').addEventListener('click', async () => {
+  const boss = document.getElementById('cc-boss').value.trim();
+  const date = document.getElementById('cc-date').value.trim();
+  const btn = document.getElementById('btn-save-sheets');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const res = await fetch('/save-attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ boss, date, attendance: attendanceData })
+    });
+    const data = await res.json();
+    if (!res.ok) { showStatus('cc-status', data.error || 'Erro ao salvar.', 'error'); return; }
+
+    const added = data.newly_added_to_cp_list || [];
+    let msg = `Salvo! ${data.cps_saved} CPs registradas na planilha.`;
+    if (added.length) {
+      const names = added.map(x => `${x.member} → ${x.cp}`).join(', ');
+      msg += ` | ✅ Adicionados à CP List: ${names}`;
+    }
+    showStatus('cc-status', msg, 'success');
+  } catch { showStatus('cc-status', 'Erro de conexão ao salvar.', 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Salvar na Planilha Google Sheets'; }
+});
+</script>
+</body>
+</html>
