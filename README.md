@@ -2,6 +2,10 @@
   <h1>⚔️ Epics — L2 Boss Tracker</h1>
   <p>Gerenciador de Epic Bosses e presença de guild para Lineage 2</p>
 
+  <a href="https://discord-sheets-app.vercel.app">
+    <img src="https://img.shields.io/badge/demo-live-brightgreen?style=for-the-badge" alt="Live Demo" />
+  </a>
+  &nbsp;
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/Flask-3-black?style=for-the-badge&logo=flask" />
   <img src="https://img.shields.io/badge/Claude_AI-Vision-FF6B35?style=for-the-badge" />
