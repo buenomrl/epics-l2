@@ -142,3 +142,11 @@ epics-l2/
 | `POST` | `/send` | Envia mensagem para o Discord |
 | `POST` | `/process-cc` | Processa screenshots de CC e identifica membros |
 | `POST` | `/save-attendance` | Salva presença no Google Sheets |
+
+---
+
+## Deploy
+
+Hospedado na Vercel: **[discord-sheets-app.vercel.app](https://discord-sheets-app.vercel.app)**
+
+> As funcionalidades requerem as variáveis de ambiente configuradas no painel da Vercel.
